@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Image } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Image, Alert } from "react-native";
 import { Fragment, useState } from "react";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -8,7 +8,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 
 import { ScreenContainer } from "@/components/screen-container";
-import { notify } from "@/lib/alert";
 
 // Colors from .claude/stitch_ecotwin_buildings_dashboard_redesign/ecotwin_sovereign/DESIGN.md.
 // Scoped locally to this flow only (not the shared app theme, which still
@@ -183,7 +182,7 @@ export default function AddBuildingScreen() {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      notify("Permission needed", "Camera permission is required to take photos");
+      Alert.alert("Permission needed", "Camera permission is required to take photos");
       return;
     }
 
@@ -217,20 +216,7 @@ export default function AddBuildingScreen() {
 
   const handleSave = async () => {
     if (!buildingType || !name || !location || !size || !floors) {
-      notify("Missing Information", "Please fill in all required fields");
-      return;
-    }
-
-    const parsedSize = parseInt(size, 10);
-    const parsedFloors = parseInt(floors, 10);
-
-    if (!Number.isFinite(parsedSize) || parsedSize <= 0) {
-      notify("Invalid Size", "Please enter a valid positive number for size (sq ft)");
-      return;
-    }
-
-    if (!Number.isFinite(parsedFloors) || parsedFloors <= 0) {
-      notify("Invalid Floors", "Please enter a valid positive number for floors");
+      Alert.alert("Missing Information", "Please fill in all required fields");
       return;
     }
 
@@ -241,8 +227,8 @@ export default function AddBuildingScreen() {
       type: buildingType,
       name,
       location,
-      size: parsedSize,
-      floors: parsedFloors,
+      size: parseInt(size),
+      floors: parseInt(floors),
       image,
       createdAt: new Date().toISOString(),
     };
@@ -253,10 +239,11 @@ export default function AddBuildingScreen() {
       buildings.push(newBuilding);
       await AsyncStorage.setItem("buildings", JSON.stringify(buildings));
 
-      notify("Success", "Building added successfully!");
-      router.replace("/(tabs)/buildings");
+      Alert.alert("Success", "Building added successfully!", [
+        { text: "OK", onPress: () => router.replace("/(tabs)/buildings") }
+      ]);
     } catch (error) {
-      notify("Error", "Failed to save building");
+      Alert.alert("Error", "Failed to save building");
     }
   };
 
@@ -443,7 +430,7 @@ export default function AddBuildingScreen() {
                     <Ionicons name="resize-outline" size={16} color={THEME.outline} />
                     <TextInput
                       value={size}
-                      onChangeText={(text) => setSize(text.replace(/[^0-9]/g, ""))}
+                      onChangeText={setSize}
                       placeholder="e.g., 60000"
                       keyboardType="numeric"
                       placeholderTextColor={THEME.outline}
@@ -475,7 +462,7 @@ export default function AddBuildingScreen() {
                     <Ionicons name="layers-outline" size={16} color={THEME.outline} />
                     <TextInput
                       value={floors}
-                      onChangeText={(text) => setFloors(text.replace(/[^0-9]/g, ""))}
+                      onChangeText={setFloors}
                       placeholder="e.g., 18"
                       keyboardType="numeric"
                       placeholderTextColor={THEME.outline}

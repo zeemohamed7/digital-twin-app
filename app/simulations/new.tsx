@@ -10,14 +10,7 @@ import {
 import { useState, useEffect, Fragment } from 'react'
 import { router } from 'expo-router'
 import * as Haptics from 'expo-haptics'
-import Animated, {
-  FadeInDown,
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withTiming
-} from 'react-native-reanimated'
+import Animated, { FadeInDown } from 'react-native-reanimated'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Ionicons } from '@expo/vector-icons'
 import Svg, { Circle } from 'react-native-svg'
@@ -198,39 +191,30 @@ function ReviewSection({
 
 // Decorative only -- runSimulation() executes synchronously (no real
 // multi-stage async job), so this ring/percentage doesn't track actual
-// progress. Percent/completion are driven by the parent (a single timer,
-// see NewSimulationScreen) so the ring's own completion is what triggers
-// the auto-advance into results -- no separate "View Results" tap needed.
-function ComputeRing({
-  subtitle,
-  percent,
-  complete
-}: {
-  subtitle: string
-  percent: number
-  complete: boolean
-}) {
+// progress. It counts up once on mount purely for visual flavor, the same
+// way HudGrid/glow are decorative elsewhere; the button below is tappable
+// immediately regardless of where the count is, so no behavior changes.
+function ComputeRing({ subtitle }: { subtitle: string }) {
   const size = 220
   const strokeWidth = 10
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
-  const dashOffset = circumference * (1 - percent / 100)
+  const target = 100
 
-  // One-shot pulse the instant completion flips true -- makes the moment
-  // register clearly even at a glance (screen-share/projector), not just
-  // the glow ramping up passively.
-  const pulse = useSharedValue(1)
+  const [percent, setPercent] = useState(0)
+
   useEffect(() => {
-    if (complete) {
-      pulse.value = withSequence(
-        withTiming(1.1, { duration: 180, easing: Easing.out(Easing.quad) }),
-        withTiming(1, { duration: 260, easing: Easing.inOut(Easing.quad) })
-      )
-    }
-  }, [complete, pulse])
-  const pulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulse.value }]
-  }))
+    const start = Date.now()
+    const duration = 1800
+    const id = setInterval(() => {
+      const t = Math.min((Date.now() - start) / duration, 1)
+      setPercent(target * t)
+      if (t >= 1) clearInterval(id)
+    }, 50)
+    return () => clearInterval(id)
+  }, [])
+
+  const dashOffset = circumference * (1 - percent / 100)
 
   return (
     <View
@@ -298,22 +282,7 @@ function ComputeRing({
         >
           {subtitle}
         </Text>
-        <Animated.View
-          style={[
-            { width: size, height: size },
-            pulseStyle,
-            {
-              // DESIGN.md glow token (0 0 8px rgba(45,212,191,0.4)), pushed
-              // well past that baseline on completion so it reads clearly
-              // even on a screen-share/projector, not just up close.
-              shadowColor: THEME.primary,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: complete ? 0.95 : 0.35,
-              shadowRadius: complete ? 36 : 16,
-              elevation: complete ? 18 : 6
-            }
-          ]}
-        >
+        <View style={{ width: size, height: size }}>
           <Svg width={size} height={size}>
             <Circle
               cx={size / 2}
@@ -348,48 +317,29 @@ function ComputeRing({
               justifyContent: 'center'
             }}
           >
-            {complete ? (
-              <>
-                <Ionicons name="checkmark-circle" size={44} color={THEME.primary} />
-                <Text
-                  className="font-mono"
-                  style={{
-                    color: THEME.primary,
-                    fontSize: 13,
-                    letterSpacing: 2,
-                    marginTop: 10
-                  }}
-                >
-                  COMPLETE
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text
-                  className="font-mono"
-                  style={{
-                    color: THEME.primary,
-                    fontSize: 11,
-                    letterSpacing: 2,
-                    marginBottom: 6
-                  }}
-                >
-                  COMPUTING
-                </Text>
-                <Text
-                  className="font-sans"
-                  style={{
-                    color: THEME.onSurface,
-                    fontSize: 34,
-                    fontWeight: '700'
-                  }}
-                >
-                  {percent.toFixed(1)}%
-                </Text>
-              </>
-            )}
+            <Text
+              className="font-mono"
+              style={{
+                color: THEME.primary,
+                fontSize: 11,
+                letterSpacing: 2,
+                marginBottom: 6
+              }}
+            >
+              COMPUTING
+            </Text>
+            <Text
+              className="font-sans"
+              style={{
+                color: THEME.onSurface,
+                fontSize: 34,
+                fontWeight: '700'
+              }}
+            >
+              {percent.toFixed(1)}%
+            </Text>
           </View>
-        </Animated.View>
+        </View>
       </View>
     </View>
   )
@@ -543,41 +493,6 @@ export default function NewSimulationScreen() {
       Alert.alert('Error', 'Failed to save simulation')
     }
   }
-
-  const [simPercent, setSimPercent] = useState(0)
-  const [simComplete, setSimComplete] = useState(false)
-
-  // Drives the compute ring while on the "running" step. Timing is fixed
-  // (not tied to real work -- runSimulation() above is synchronous), tuned
-  // to land the ring fill + completion flash around ~2.2s total so it
-  // reads as snappy in a live demo rather than an artificial delay.
-  useEffect(() => {
-    if (step !== 5) return
-    setSimPercent(0)
-    setSimComplete(false)
-    const start = Date.now()
-    const duration = 1800
-    const id = setInterval(() => {
-      const t = Math.min((Date.now() - start) / duration, 1)
-      setSimPercent(100 * t)
-      if (t >= 1) {
-        clearInterval(id)
-        setSimComplete(true)
-      }
-    }, 50)
-    return () => clearInterval(id)
-  }, [step])
-
-  // Auto-advance into results once the completion flash has had a beat to
-  // register -- no separate "View Results" tap, so loading and the result
-  // read as one continuous motion instead of two stacked elements.
-  useEffect(() => {
-    if (!simComplete) return
-    const id = setTimeout(() => {
-      runSimulation()
-    }, 400)
-    return () => clearTimeout(id)
-  }, [simComplete])
 
   return (
     <ScreenContainer containerClassName="" className="">
@@ -1255,8 +1170,6 @@ export default function NewSimulationScreen() {
 
               <ComputeRing
                 subtitle={`// ${(interventionType ?? 'SIMULATION').toUpperCase()} · ${selectedBuilding?.name ?? ''}`}
-                percent={simPercent}
-                complete={simComplete}
               />
 
               <Text
@@ -1269,7 +1182,7 @@ export default function NewSimulationScreen() {
                   textAlign: 'center'
                 }}
               >
-                {simComplete ? 'Simulation Complete' : 'Running Simulation'}
+                Running Simulation
               </Text>
               <Text
                 className="font-sans"
@@ -1280,10 +1193,38 @@ export default function NewSimulationScreen() {
                   textAlign: 'center'
                 }}
               >
-                {simComplete
-                  ? 'Loading results...'
-                  : 'Analyzing carbon impact and cost-benefit...'}
+                Analyzing carbon impact and cost-benefit...
               </Text>
+
+              <TouchableOpacity
+                onPress={runSimulation}
+                className="flex-row items-center justify-center"
+                style={{
+                  borderRadius: 16,
+                  height: 56,
+                  paddingHorizontal: 32,
+                  backgroundColor: THEME.primary,
+                  gap: 8,
+                  shadowColor: THEME.primary,
+                  shadowOpacity: 0.5,
+                  shadowRadius: 16,
+                  shadowOffset: { width: 0, height: 0 },
+                  elevation: 8
+                }}
+              >
+                <Ionicons name="play" size={16} color={THEME.onPrimary} />
+                <Text
+                  className="font-mono"
+                  style={{
+                    color: THEME.onPrimary,
+                    fontSize: 14,
+                    fontWeight: '700',
+                    letterSpacing: 1
+                  }}
+                >
+                  VIEW RESULTS
+                </Text>
+              </TouchableOpacity>
             </Animated.View>
           )}
         </ScrollView>
