@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Image, Alert } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Image } from "react-native";
 import { Fragment, useState } from "react";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 
 import { ScreenContainer } from "@/components/screen-container";
+import { showAlert } from "@/lib/alert";
 
 // Colors from .claude/stitch_ecotwin_buildings_dashboard_redesign/ecotwin_sovereign/DESIGN.md.
 // Scoped locally to this flow only (not the shared app theme, which still
@@ -182,7 +183,7 @@ export default function AddBuildingScreen() {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Camera permission is required to take photos");
+      showAlert("Permission needed", "Camera permission is required to take photos");
       return;
     }
 
@@ -216,7 +217,7 @@ export default function AddBuildingScreen() {
 
   const handleSave = async () => {
     if (!buildingType || !name || !location || !size || !floors) {
-      Alert.alert("Missing Information", "Please fill in all required fields");
+      showAlert("Missing Information", "Please fill in all required fields");
       return;
     }
 
@@ -239,11 +240,11 @@ export default function AddBuildingScreen() {
       buildings.push(newBuilding);
       await AsyncStorage.setItem("buildings", JSON.stringify(buildings));
 
-      Alert.alert("Success", "Building added successfully!", [
+      showAlert("Success", "Building added successfully!", [
         { text: "OK", onPress: () => router.replace("/(tabs)/buildings") }
       ]);
     } catch (error) {
-      Alert.alert("Error", "Failed to save building");
+      showAlert("Error", "Failed to save building");
     }
   };
 

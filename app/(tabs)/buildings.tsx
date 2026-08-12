@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, TouchableOpacity, Image, TextInput, Alert } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, Image, TextInput } from "react-native";
 import { useState } from "react";
 import { Link, router, useFocusEffect } from "expo-router";
 import { useCallback } from "react";
@@ -12,6 +12,7 @@ import { loadDemoBuildings } from "@/lib/demoBuildings";
 import { ScreenContainer } from "@/components/screen-container";
 import { Badge } from "@/components/ui/badge";
 import { useColors } from "@/hooks/use-colors";
+import { showAlert } from "@/lib/alert";
 
 // Same spacing system as the homepage: one 8px grid, page margin applied
 // once at the top level. See app/(tabs)/index.tsx for the full rationale.
@@ -62,7 +63,7 @@ export default function BuildingsScreen() {
   };
 
   const deleteBuilding = async (id: string) => {
-    Alert.alert(
+    showAlert(
       "Delete Building",
       "Are you sure you want to delete this building?",
       [
@@ -77,7 +78,7 @@ export default function BuildingsScreen() {
               setBuildings(filtered);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (error) {
-              Alert.alert("Error", "Failed to delete building");
+              showAlert("Error", "Failed to delete building");
             }
           },
         },

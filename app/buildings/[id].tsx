@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, TouchableOpacity, Image, Alert } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, Image } from "react-native";
 import { useState, useEffect } from "react";
 import { useLocalSearchParams, router } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -15,6 +15,7 @@ import { Building3DView } from "@/components/Building3DView";
 import { HudGrid } from "@/components/ui/hud-grid";
 import { LoadingIndicator } from "@/components/ui/loading-indicator";
 import { loadDemoBuildings } from "@/lib/demoBuildings";
+import { showAlert } from "@/lib/alert";
 import { LineChart, BarChart } from "react-native-chart-kit";
 import { Dimensions } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
@@ -328,7 +329,7 @@ export default function BuildingDetailScreen() {
   };
 
   const deleteBuilding = async () => {
-    Alert.alert(
+    showAlert(
       "Delete Building",
       "Are you sure you want to delete this building?",
       [
@@ -347,7 +348,7 @@ export default function BuildingDetailScreen() {
                 router.back();
               }
             } catch (error) {
-              Alert.alert("Error", "Failed to delete building");
+              showAlert("Error", "Failed to delete building");
             }
           },
         },
