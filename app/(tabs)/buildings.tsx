@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, TouchableOpacity, Image, TextInput, Alert } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, Image, TextInput } from "react-native";
 import { useState } from "react";
 import { Link, router, useFocusEffect } from "expo-router";
 import { useCallback } from "react";
@@ -12,6 +12,7 @@ import { loadDemoBuildings } from "@/lib/demoBuildings";
 import { ScreenContainer } from "@/components/screen-container";
 import { Badge } from "@/components/ui/badge";
 import { useColors } from "@/hooks/use-colors";
+import { confirmDestructive, notify } from "@/lib/alert";
 
 // Same spacing system as the homepage: one 8px grid, page margin applied
 // once at the top level. See app/(tabs)/index.tsx for the full rationale.
@@ -54,7 +55,16 @@ export default function BuildingsScreen() {
     try {
       const data = await AsyncStorage.getItem("buildings");
       if (data) {
-        setBuildings(JSON.parse(data));
+        const parsed: Building[] = JSON.parse(data);
+        // Older builds could persist NaN size/floors (typed non-numeric input),
+        // which JSON.stringify silently turns into null -- coerce those back
+        // to 0 so a previously-corrupted record doesn't crash this screen.
+        const sanitized = parsed.map((b) => ({
+          ...b,
+          size: Number.isFinite(b.size) ? b.size : 0,
+          floors: Number.isFinite(b.floors) ? b.floors : 0,
+        }));
+        setBuildings(sanitized);
       }
     } catch (error) {
       console.error("Failed to load buildings", error);
@@ -62,26 +72,20 @@ export default function BuildingsScreen() {
   };
 
   const deleteBuilding = async (id: string) => {
-    Alert.alert(
+    confirmDestructive(
       "Delete Building",
       "Are you sure you want to delete this building?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const filtered = buildings.filter((b) => b.id !== id);
-              await AsyncStorage.setItem("buildings", JSON.stringify(filtered));
-              setBuildings(filtered);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete building");
-            }
-          },
-        },
-      ]
+      "Delete",
+      async () => {
+        try {
+          const filtered = buildings.filter((b) => b.id !== id);
+          await AsyncStorage.setItem("buildings", JSON.stringify(filtered));
+          setBuildings(filtered);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (error) {
+          notify("Error", "Failed to delete building");
+        }
+      }
     );
   };
 

@@ -1,6 +1,6 @@
-import { ScrollView, Text, View, TouchableOpacity, Image } from 'react-native'
+import { ScrollView, Text, View, TouchableOpacity, Image, useWindowDimensions } from 'react-native'
 import { Link, useFocusEffect } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -66,6 +66,126 @@ const features: Feature[] = [
     toneKey: 'success'
   }
 ]
+
+// Card width leaves this many px of the next card peeking in at the right
+// edge, within the page's existing PAGE_MARGIN -- signals more content
+// without bleeding the carousel past the page's normal content column.
+const CARD_PEEK = 56
+const CARD_GAP = 16
+
+/** One feature card in the Platform Features carousel. */
+function FeatureCard({
+  feature,
+  width,
+  isActive
+}: {
+  feature: Feature
+  width: number
+  isActive: boolean
+}) {
+  const colors = useColors()
+  const accent = colors[feature.toneKey]
+
+  return (
+    <View
+      style={{
+        width,
+        borderRadius: 16,
+        borderWidth: isActive ? 1.5 : 1,
+        borderColor: isActive ? colors.primary : colors.border,
+        backgroundColor: colors.surface,
+        padding: 16,
+        // DESIGN.md glow token (0 0 8px rgba(45,212,191,0.4)) on the active card.
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: isActive ? 0.4 : 0,
+        shadowRadius: 8,
+        elevation: isActive ? 6 : 0
+      }}
+    >
+      <View
+        className="items-center justify-center rounded-xl"
+        style={{
+          height: 96,
+          marginBottom: 16,
+          backgroundColor: accent + '1A',
+          borderWidth: 1,
+          borderColor: accent + '40'
+        }}
+      >
+        <Ionicons name={feature.icon} size={40} color={accent} />
+      </View>
+      <View className="flex-row items-center gap-2" style={{ flexWrap: 'wrap', marginBottom: 8 }}>
+        <Text className="font-sans text-foreground font-semibold text-base">
+          {feature.title}
+        </Text>
+        <Text className="font-mono text-[9px] uppercase tracking-wider" style={{ color: accent }}>
+          {feature.code}
+        </Text>
+      </View>
+      <Text className="font-sans text-muted text-xs" style={{ lineHeight: 18 }}>
+        {feature.description}
+      </Text>
+    </View>
+  )
+}
+
+/**
+ * Swipeable, snap-scrolling row of feature cards with a next-card peek and a
+ * dot position indicator. Replaces the old stacked text-list rendering of
+ * `features` -- same data, card layout instead of rows.
+ */
+function FeatureCarousel({ features }: { features: Feature[] }) {
+  const colors = useColors()
+  const { width: windowWidth } = useWindowDimensions()
+  const cardWidth = windowWidth - PAGE_MARGIN * 2 - CARD_PEEK
+  const snapInterval = cardWidth + CARD_GAP
+  const [activeIndex, setActiveIndex] = useState(0)
+  const scrollRef = useRef<ScrollView>(null)
+
+  const handleScroll = (event: {
+    nativeEvent: { contentOffset: { x: number } }
+  }) => {
+    const index = Math.round(event.nativeEvent.contentOffset.x / snapInterval)
+    setActiveIndex(Math.max(0, Math.min(features.length - 1, index)))
+  }
+
+  return (
+    <View>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={snapInterval}
+        decelerationRate="fast"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
+        {features.map((feature, index) => (
+          <View
+            key={feature.title}
+            style={{ marginRight: index === features.length - 1 ? 0 : CARD_GAP }}
+          >
+            <FeatureCard feature={feature} width={cardWidth} isActive={index === activeIndex} />
+          </View>
+        ))}
+      </ScrollView>
+
+      <View className="flex-row justify-center gap-2" style={{ marginTop: 16 }}>
+        {features.map((_, index) => (
+          <View
+            key={index}
+            className="h-2 rounded-full"
+            style={{
+              width: index === activeIndex ? 24 : 8,
+              backgroundColor: index === activeIndex ? colors.primary : colors.border
+            }}
+          />
+        ))}
+      </View>
+    </View>
+  )
+}
 
 /** Slow-breathing status dot for the HUD header's "System online" readout. */
 function StatusPulse() {
@@ -390,49 +510,7 @@ export default function HomeScreen() {
           <SectionHeader className="font-mono text-xs uppercase tracking-[0.25em] text-muted mt-2 mb-2">
             {'Platform Features'}
           </SectionHeader>
-          <View className="gap-4">
-            {features.map((f) => {
-              const accent = colors[f.toneKey]
-              return (
-                <View
-                  key={f.title}
-                  className="flex-row items-start gap-4 rounded-xl p-4"
-                  style={{
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    backgroundColor: colors.surface
-                  }}
-                >
-                  <View
-                    className="w-9 h-9 rounded-md items-center justify-center"
-                    style={{
-                      borderWidth: 1,
-                      borderColor: accent + '66',
-                      backgroundColor: accent + '1A'
-                    }}
-                  >
-                    <Ionicons name={f.icon} size={16} color={accent} />
-                  </View>
-                  <View className="flex-1">
-                    <View className="flex-row items-center gap-2">
-                      <Text className="font-sans text-foreground font-semibold text-sm">
-                        {f.title}
-                      </Text>
-                      <Text
-                        className="font-mono text-[9px] uppercase tracking-wider"
-                        style={{ color: accent }}
-                      >
-                        {f.code}
-                      </Text>
-                    </View>
-                    <Text className="font-sans text-muted text-xs mt-2">
-                      {f.description}
-                    </Text>
-                  </View>
-                </View>
-              )
-            })}
-          </View>
+          <FeatureCarousel features={features} />
         </Animated.View>
 
         {/* Digital Twin Concept Image */}

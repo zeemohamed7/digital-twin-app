@@ -1,6 +1,6 @@
-import { ScrollView, Text, View, TouchableOpacity, Image, Alert } from "react-native";
-import { useState, useEffect } from "react";
-import { useLocalSearchParams, router } from "expo-router";
+import { ScrollView, Text, View, TouchableOpacity, Image } from "react-native";
+import { useState, useCallback, useEffect } from "react";
+import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
@@ -15,6 +15,7 @@ import { Building3DView } from "@/components/Building3DView";
 import { HudGrid } from "@/components/ui/hud-grid";
 import { LoadingIndicator } from "@/components/ui/loading-indicator";
 import { loadDemoBuildings } from "@/lib/demoBuildings";
+import { confirmDestructive, notify } from "@/lib/alert";
 import { LineChart, BarChart } from "react-native-chart-kit";
 import { Dimensions } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
@@ -303,9 +304,11 @@ export default function BuildingDetailScreen() {
   const [building, setBuilding] = useState<Building | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "systems" | "analytics">("overview");
 
-  useEffect(() => {
-    loadBuilding();
-  }, [id]);
+  useFocusEffect(
+    useCallback(() => {
+      loadBuilding();
+    }, [id])
+  );
 
   const loadBuilding = async () => {
     try {
@@ -319,7 +322,13 @@ export default function BuildingDetailScreen() {
         const buildings = JSON.parse(data);
         const found = buildings.find((b: Building) => b.id === id);
         if (found) {
-          setBuilding(found);
+          // See buildings.tsx: older builds could persist a NaN size/floors
+          // (typed non-numeric input) as null via JSON.stringify.
+          setBuilding({
+            ...found,
+            size: Number.isFinite(found.size) ? found.size : 0,
+            floors: Number.isFinite(found.floors) ? found.floors : 0,
+          });
         }
       }
     } catch (error) {
@@ -328,30 +337,24 @@ export default function BuildingDetailScreen() {
   };
 
   const deleteBuilding = async () => {
-    Alert.alert(
+    confirmDestructive(
       "Delete Building",
       "Are you sure you want to delete this building?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const data = await AsyncStorage.getItem("buildings");
-              if (data) {
-                const buildings = JSON.parse(data);
-                const filtered = buildings.filter((b: Building) => b.id !== id);
-                await AsyncStorage.setItem("buildings", JSON.stringify(filtered));
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                router.back();
-              }
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete building");
-            }
-          },
-        },
-      ]
+      "Delete",
+      async () => {
+        try {
+          const data = await AsyncStorage.getItem("buildings");
+          if (data) {
+            const buildings = JSON.parse(data);
+            const filtered = buildings.filter((b: Building) => b.id !== id);
+            await AsyncStorage.setItem("buildings", JSON.stringify(filtered));
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            router.back();
+          }
+        } catch (error) {
+          notify("Error", "Failed to delete building");
+        }
+      }
     );
   };
 
@@ -395,7 +398,10 @@ export default function BuildingDetailScreen() {
           </View>
           <View className="flex-row gap-2">
             <TouchableOpacity
-              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push(`/buildings/edit/${id}`);
+              }}
               className="rounded-full items-center justify-center"
               style={{ width: 36, height: 36, borderWidth: 1, borderColor: colors.border }}
             >

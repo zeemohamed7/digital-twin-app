@@ -11,6 +11,7 @@ import { MetricCard } from '@/components/ui/card'
 import { LoadingIndicator } from '@/components/ui/loading-indicator'
 import { useColors } from '@/hooks/use-colors'
 import { getSimulationById, type FormattedSimulation } from '@/lib/simulations'
+import { exportSimulationToExcel } from '@/lib/exportSimulation'
 
 // Same spacing system as the rest of the app: one 8px grid, page margin
 // applied once at the top level. See app/(tabs)/index.tsx for the rationale.
@@ -61,6 +62,13 @@ export default function SimulationResultsScreen() {
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+  }
+
+  const handleExport = () => {
+    handlePress()
+    exportSimulationToExcel(simulation, reductionPercentage).catch((error) => {
+      console.error('Failed to export simulation', error)
+    })
   }
 
   return (
@@ -369,23 +377,19 @@ export default function SimulationResultsScreen() {
             </Text>
           </TouchableOpacity>
 
-          <View
+          <TouchableOpacity
+            onPress={handleExport}
             className="rounded-2xl flex-row items-center justify-center gap-2"
             style={{
               borderWidth: 1,
               borderColor: colors.border,
-              opacity: 0.6,
+              backgroundColor: colors.surface,
               paddingVertical: 14
             }}
           >
-            <Ionicons
-              name="document-text-outline"
-              size={18}
-              color={colors.muted}
-            />
-            <Text className="text-muted font-semibold">Export PDF Report</Text>
-            <Badge label="Coming soon" tone="neutral" />
-          </View>
+            <Ionicons name="download-outline" size={18} color={colors.foreground} />
+            <Text className="text-foreground font-semibold">Export to Excel</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </ScreenContainer>
